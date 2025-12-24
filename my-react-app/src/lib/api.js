@@ -378,6 +378,22 @@ export const documentAPI = {
       throw error;
     }
   },
+
+  /**
+   * Get user notifications
+   */
+  getNotifications: async () => {
+    return await apiRequest('/documents/notifications');
+  },
+
+  /**
+   * Mark all notifications as read
+   */
+  markAllNotificationsAsRead: async () => {
+    return await apiRequest('/documents/notifications/mark-all-read', {
+      method: 'PUT',
+    });
+  },
 };
 
 export default apiRequest;

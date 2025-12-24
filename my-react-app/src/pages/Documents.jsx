@@ -3,17 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/dashboard.css';
 import { documentAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useDocuments } from '../contexts/DocumentContext';
 
 const Documents = () => {
     const { user } = useAuth();
+    const { documents, folderStats, loadingDocuments, refreshDocuments, refreshStats, refreshFolderStats } = useDocuments();
     const navigate = useNavigate();
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
-    const [folderStats, setFolderStats] = useState(null);
-    const [documents, setDocuments] = useState([]);
     const [filteredDocuments, setFilteredDocuments] = useState([]);
-    const [loadingDocuments, setLoadingDocuments] = useState(false);
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [filterStatus, setFilterStatus] = useState('all');
@@ -37,33 +36,12 @@ const Documents = () => {
         'khac': 'Khác',
     };
 
-    // Load folder stats và documents khi component mount
-    useEffect(() => {
-        const loadData = async () => {
-            if (!user) return;
-            try {
-                // Load folder stats
-                const statsResult = await documentAPI.getFolderStats();
-                setFolderStats(statsResult.data || {});
-                
-                // Load documents
-                setLoadingDocuments(true);
-                const docsResult = await documentAPI.getUserDocuments();
-                const docs = docsResult.data?.documents || [];
-                setDocuments(docs);
-                setFilteredDocuments(docs);
-            } catch (error) {
-                console.error('Error loading data:', error);
-            } finally {
-                setLoadingDocuments(false);
-            }
-        };
-        loadData();
-    }, [user]);
+    // Documents và folderStats được load từ DocumentContext
+    // Không cần load lại khi component mount
 
     // Apply filter và sort khi có thay đổi
     useEffect(() => {
-        let filtered = [...documents];
+        let filtered = [...(documents || [])];
 
         // Exclude deleted documents
         filtered = filtered.filter(doc => doc.status !== 'deleted');
@@ -149,6 +127,13 @@ const Documents = () => {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+
+            // Refresh documents, stats và folder stats sau khi upload
+            await Promise.all([
+                refreshDocuments(),
+                refreshStats(),
+                refreshFolderStats(),
+            ]);
         } catch (error) {
             console.error('Upload error:', error);
             setUploadResult({
@@ -158,7 +143,7 @@ const Documents = () => {
         } finally {
             setIsUploading(false);
         }
-    }, [user]);
+    }, [user, refreshDocuments, refreshStats, refreshFolderStats]);
 
     // Xử lý khi chọn file từ input
     const handleFileSelect = useCallback((e) => {
@@ -237,8 +222,12 @@ const Documents = () => {
         setDeleting(true);
         try {
             await documentAPI.deleteDocument(documentToDelete.id);
-            // Remove from documents
-            setDocuments(prev => prev.filter(doc => doc.id !== documentToDelete.id));
+            // Refresh documents, stats và folder stats sau khi xóa
+            await Promise.all([
+                refreshDocuments(),
+                refreshStats(),
+                refreshFolderStats(),
+            ]);
             setShowDeleteConfirm(false);
             setDocumentToDelete(null);
         } catch (error) {
@@ -247,7 +236,7 @@ const Documents = () => {
         } finally {
             setDeleting(false);
         }
-    }, [documentToDelete]);
+    }, [documentToDelete, refreshDocuments, refreshStats, refreshFolderStats]);
 
     // Handle document click - open file
     const handleDocumentClick = useCallback((storagePath) => {
@@ -817,19 +806,26 @@ const Documents = () => {
                             <p>Chưa có tài liệu nào</p>
                         </div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b' }}>Tên tài liệu</th>
-                                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b' }}>Phân loại AI (Auto-Tag)</th>
-                                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b' }}>Trạng thái</th>
-                                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b' }}>Trạng thái Audit</th>
-                                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b' }}>Thời gian</th>
-                                    <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', color: '#64748b', width: '50px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredDocuments.map((doc) => {
+                        <div style={{
+                            maxHeight: '600px',
+                            overflowY: 'auto',
+                            overflowX: 'hidden',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                        }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10 }}>
+                                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b', backgroundColor: 'white' }}>Tên tài liệu</th>
+                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b', backgroundColor: 'white' }}>Phân loại AI (Auto-Tag)</th>
+                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b', backgroundColor: 'white' }}>Trạng thái</th>
+                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b', backgroundColor: 'white' }}>Trạng thái Audit</th>
+                                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '14px', color: '#64748b', backgroundColor: 'white' }}>Thời gian</th>
+                                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', color: '#64748b', width: '50px', backgroundColor: 'white' }}></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredDocuments.map((doc) => {
                                     const statusColor = getStatusColor(doc.status);
                                     const categoryName = getCategoryFromPath(doc.storage_path);
                                     return (
@@ -973,9 +969,10 @@ const Documents = () => {
                                             </td>
                                         </tr>
                                     );
-                                })}
-                            </tbody>
-                        </table>
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
 

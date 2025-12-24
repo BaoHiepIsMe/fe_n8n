@@ -1,26 +1,17 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import '../styles/dashboard.css';
 import { documentAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useDocuments } from '../contexts/DocumentContext';
 
 const Dashboard = () => {
     const { user } = useAuth();
+    const { documents, stats, loadingDocuments, loadingStats, refreshDocuments, refreshStats, refreshFolderStats } = useDocuments();
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
-    const [documents, setDocuments] = useState([]);
-    const [loadingDocuments, setLoadingDocuments] = useState(false);
-    const [stats, setStats] = useState({
-        newDocumentsThisWeek: 0,
-        pendingApproval: 0,
-        riskDocuments: 0,
-        unprocessedDocuments: 0,
-    });
-    const [loadingStats, setLoadingStats] = useState(false);
     const fileInputRef = useRef(null);
     const dragCounterRef = useRef(0);
-    const documentsRef = useRef([]); // Ref để lưu documents hiện tại cho việc so sánh
-    const statsRef = useRef({}); // Ref để lưu stats hiện tại cho việc so sánh
 
     // Xử lý upload file
     const handleFile = useCallback(async (file) => {
@@ -58,8 +49,12 @@ const Dashboard = () => {
                 fileInputRef.current.value = '';
             }
 
-            // Reload documents để hiển thị file mới
-            await loadDocuments();
+            // Reload documents, stats và folder stats để hiển thị dữ liệu mới
+            await Promise.all([
+                refreshDocuments(),
+                refreshStats(),
+                refreshFolderStats(),
+            ]);
         } catch (error) {
             console.error('Upload error:', error);
             setUploadResult({
@@ -70,7 +65,7 @@ const Dashboard = () => {
         } finally {
             setIsUploading(false);
         }
-    }, [user]);
+    }, [user, refreshDocuments, refreshStats, refreshFolderStats]);
 
     // Xử lý khi chọn file từ input
     const handleFileSelect = useCallback((e) => {
@@ -122,145 +117,6 @@ const Dashboard = () => {
             fileInputRef.current.click();
         }
     }, []);
-
-    // Load documents từ database (có thể silent - không hiển thị loading)
-    const loadDocuments = useCallback(async (silent = false) => {
-        if (!user) return;
-
-        if (!silent) {
-            setLoadingDocuments(true);
-        }
-        try {
-            const result = await documentAPI.getUserDocuments();
-            console.log('Documents API result:', result);
-            const docs = result.data?.documents || result.data?.data?.documents || result.documents || [];
-            console.log('Parsed documents:', docs, 'Count:', docs.length);
-            
-            // So sánh với documents hiện tại để chỉ update khi có thay đổi
-            if (silent && documentsRef.current.length > 0) {
-                // Tạo map để so sánh hiệu quả hơn
-                const currentDocsMap = new Map(documentsRef.current.map(doc => [doc.id, doc]));
-                const newDocsMap = new Map(docs.map(doc => [doc.id, doc]));
-                
-                // Kiểm tra xem có thay đổi không:
-                // 1. Số lượng thay đổi (có tài liệu mới hoặc bị xóa)
-                // 2. Có document mới (id không tồn tại trong current)
-                // 3. Có document bị xóa (id không tồn tại trong docs mới)
-                // 4. Các trường quan trọng thay đổi (processing, sensitivity_level, title)
-                const hasNewDocuments = docs.some(newDoc => !currentDocsMap.has(newDoc.id));
-                const hasDeletedDocuments = documentsRef.current.some(oldDoc => !newDocsMap.has(oldDoc.id));
-                const hasChangedFields = docs.some(newDoc => {
-                    const oldDoc = currentDocsMap.get(newDoc.id);
-                    return oldDoc && (
-                        oldDoc.processing !== newDoc.processing ||
-                        oldDoc.sensitivity_level !== newDoc.sensitivity_level ||
-                        oldDoc.title !== newDoc.title
-                    );
-                });
-                
-                const hasChanges = docs.length !== documentsRef.current.length || 
-                    hasNewDocuments || 
-                    hasDeletedDocuments || 
-                    hasChangedFields;
-                
-                // Chỉ update state khi có thay đổi
-                if (hasChanges) {
-                    console.log('Documents changed:', { 
-                        hasNewDocuments, 
-                        hasDeletedDocuments, 
-                        hasChangedFields,
-                        oldCount: documentsRef.current.length,
-                        newCount: docs.length
-                    });
-                    setDocuments(docs);
-                    documentsRef.current = docs; // Cập nhật ref
-                }
-            } else {
-                // Lần load đầu tiên hoặc không silent: luôn update
-                console.log('Initial load - setting documents:', docs.length);
-                setDocuments(docs);
-                documentsRef.current = docs; // Cập nhật ref
-            }
-        } catch (error) {
-            console.error('Error loading documents:', error);
-            if (!silent) {
-                setDocuments([]);
-                documentsRef.current = [];
-            }
-        } finally {
-            if (!silent) {
-                setLoadingDocuments(false);
-            }
-        }
-    }, [user]);
-
-    // Load dashboard stats (có thể silent - không hiển thị loading)
-    const loadStats = useCallback(async (silent = false) => {
-        if (!user) return;
-
-        if (!silent) {
-            setLoadingStats(true);
-        }
-        try {
-            const result = await documentAPI.getDashboardStats();
-            const statsData = result.data || result.data?.data || {};
-            const newStats = {
-                newDocumentsThisWeek: statsData.newDocumentsThisWeek || 0,
-                pendingApproval: statsData.pendingApproval || 0,
-                riskDocuments: statsData.riskDocuments || 0,
-                unprocessedDocuments: statsData.unprocessedDocuments || 0,
-            };
-
-            // So sánh với stats hiện tại để chỉ update khi có thay đổi
-            if (silent && statsRef.current && Object.keys(statsRef.current).length > 0) {
-                const hasChanges = 
-                    statsRef.current.newDocumentsThisWeek !== newStats.newDocumentsThisWeek ||
-                    statsRef.current.pendingApproval !== newStats.pendingApproval ||
-                    statsRef.current.riskDocuments !== newStats.riskDocuments ||
-                    statsRef.current.unprocessedDocuments !== newStats.unprocessedDocuments;
-
-                // Chỉ update state khi có thay đổi
-                if (hasChanges) {
-                    setStats(newStats);
-                    statsRef.current = newStats;
-                }
-            } else {
-                // Lần load đầu tiên hoặc không silent: luôn update
-                setStats(newStats);
-                statsRef.current = newStats;
-            }
-        } catch (error) {
-            console.error('Error loading stats:', error);
-            if (!silent) {
-                setStats({
-                    newDocumentsThisWeek: 0,
-                    pendingApproval: 0,
-                    riskDocuments: 0,
-                    unprocessedDocuments: 0,
-                });
-                statsRef.current = {};
-            }
-        } finally {
-            if (!silent) {
-                setLoadingStats(false);
-            }
-        }
-    }, [user]);
-
-    // Load documents và stats khi component mount hoặc user thay đổi
-    useEffect(() => {
-        loadDocuments(false); // Lần đầu: có loading
-        loadStats(false); // Lần đầu: có loading
-
-        // Polling: Tự động check changes mỗi 5 giây (silent - không loading)
-        const interval = setInterval(() => {
-            loadDocuments(true); // Silent update cho documents
-            loadStats(true); // Silent update cho stats - chỉ update khi có thay đổi
-        }, 5000); // 5 giây
-
-        // Cleanup interval khi component unmount
-        return () => clearInterval(interval);
-    }, [user, loadDocuments, loadStats]);
 
     // Helper: Lấy icon file từ mime_type
     const getFileIcon = (mimeType) => {
@@ -451,6 +307,7 @@ const Dashboard = () => {
                             ) : (
                                 documents
                                     .filter(doc => doc.status !== 'deleted')
+                                    .slice(0, 5) // Chỉ hiển thị 5 tài liệu gần nhất
                                     .map((doc) => {
                                         const iconName = getFileIcon(doc.mime_type);
                                         const iconColor = getFileIconColor(doc.mime_type);
