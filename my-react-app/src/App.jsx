@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import Documents from './pages/Documents';
 import DocumentsCategory from './pages/DocumentsCategory';
 import ESignature from './pages/ESignature';
+import DepartmentSetup from './pages/DepartmentSetup';
 
 import SignatureManagementPage from './pages/SignatureManagementPage';
 import SignDocumentPage from './pages/SignDocumentPage';
@@ -26,9 +27,9 @@ import './styles/App.css';
 
 // Private Route - chỉ cho phép khi đã đăng nhập và đã load xong profile
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, userProfile, loading } = useAuth();
+  const { isAuthenticated, userProfile, loading, needsDepartmentSetup, departmentsLoading } = useAuth();
 
-  if (loading) {
+  if (loading || departmentsLoading) {
     return <div style={{ padding: '50px', textAlign: 'center' }}>Đang tải...</div>;
   }
 
@@ -39,6 +40,10 @@ const PrivateRoute = ({ children }) => {
 
   // Chỉ render khi đã có cả user và profile
   if (isAuthenticated && userProfile) {
+    // Kiểm tra xem cần setup phòng ban không
+    if (needsDepartmentSetup) {
+      return <Navigate to="/department-setup" replace />;
+    }
     return children;
   }
 
@@ -81,6 +86,27 @@ const HomeRoute = ({ children }) => {
   return children;
 };
 
+// Department Setup Route - cho phép truy cập khi đã login nhưng chưa setup phòng ban
+const DepartmentSetupRoute = ({ children }) => {
+  const { isAuthenticated, userProfile, loading, needsDepartmentSetup, completeDepartmentSetup, departmentsLoading } = useAuth();
+
+  if (loading || departmentsLoading) {
+    return <div style={{ padding: '50px', textAlign: 'center' }}>Đang tải...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Nếu không cần setup phòng ban nữa, redirect về dashboard
+  if (!needsDepartmentSetup) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Wrap children với onComplete callback
+  return React.cloneElement(children, { onComplete: completeDepartmentSetup });
+};
+
 const App = () => {
   return (
     <Router>
@@ -105,6 +131,15 @@ const App = () => {
         <Route path="/sign" element={<SignDocumentPage />} />
         <Route path="/view-document/:requestId" element={<ViewDocumentPage />} />
         
+        {/* Department Setup - Protected but shown before dashboard */}
+        <Route 
+          path="/department-setup" 
+          element={
+            <DepartmentSetupRoute>
+              <DepartmentSetup />
+            </DepartmentSetupRoute>
+          } 
+        />
 
         {/* Dashboard routes - Protected */}
         <Route 
