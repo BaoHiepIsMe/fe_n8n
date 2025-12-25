@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { authAPI } from '../lib/api';
+import { authAPI, departmentConfigAPI } from '../lib/api';
 
 const AuthContext = createContext(null);
+
+// Danh sách 7 phòng ban mặc định
+const DEFAULT_DEPARTMENTS = [
+  { category_key: 'Finance & Tax', department_name: 'Phòng Tài chính - Kế toán' },
+  { category_key: 'Legal & Contracts', department_name: 'Phòng Pháp chế' },
+  { category_key: 'HR & Admin', department_name: 'Phòng Hành chính - Nhân sự' },
+  { category_key: 'Sales & CRM', department_name: 'Phòng Kinh doanh' },
+  { category_key: 'Projects & Tech', department_name: 'Phòng Kỹ thuật & Dự án' },
+  { category_key: 'Marketing', department_name: 'Phòng Marketing' },
+  { category_key: 'Other', department_name: 'Bộ phận Quản lý chung' },
+];
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -16,9 +27,12 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [needsDepartmentSetup, setNeedsDepartmentSetup] = useState(false);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const mounted = useRef(true);
   const profileFromBackendRef = useRef(null); // Lưu profile từ backend để tránh bị ghi đè
   const isSigningInRef = useRef(false); // Flag để biết đang trong quá trình signIn
+  const departmentCheckDone = useRef(false); // Flag để tránh check department 2 lần
 
   /**
    * Load user profile từ database
@@ -75,7 +89,71 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Đăng ký
+   * Kiểm tra xem user đã cấu hình đủ phòng ban chưa
+   * Nếu chưa có hoặc chưa đủ 7 phòng ban -> cần setup
+   * Trả về true nếu cần setup, false nếu đã có đủ
+   */
+  const checkDepartmentSetup = async () => {
+    if (departmentCheckDone.current) {
+      console.log('⏭️ Department check already done, skipping...');
+      return needsDepartmentSetup;
+    }
+
+    setDepartmentsLoading(true);
+    try {
+      console.log('🔄 Checking department setup...');
+      const result = await departmentConfigAPI.getDepartmentConfigs();
+      const existingDepts = result.data?.departments || result.data?.data?.departments || result.departments || [];
+      
+      console.log('📊 Existing departments:', existingDepts.length);
+      
+      // Nếu chưa có department nào -> cần setup ngay
+      if (existingDepts.length === 0) {
+        console.log('⚠️ No departments found - setup required');
+        setNeedsDepartmentSetup(true);
+        departmentCheckDone.current = true;
+        return true;
+      }
+      
+      // Kiểm tra xem đã có đủ 7 phòng ban chưa
+      const hasAllDepartments = DEFAULT_DEPARTMENTS.every(defaultDept =>
+        existingDepts.some(d => d.category_key === defaultDept.category_key)
+      );
+
+      // Nếu chưa đủ -> cần setup
+      if (!hasAllDepartments) {
+        console.log('⚠️ Not all departments configured - setup required');
+        setNeedsDepartmentSetup(true);
+        departmentCheckDone.current = true;
+        return true;
+      }
+      
+      console.log('✅ All departments configured');
+      setNeedsDepartmentSetup(false);
+      departmentCheckDone.current = true;
+      return false;
+    } catch (error) {
+      console.error('❌ Error checking department setup:', error);
+      // Nếu lỗi, vẫn cho phép tiếp tục (không block user)
+      setNeedsDepartmentSetup(false);
+      return false;
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
+  /**
+   * Hoàn thành setup phòng ban
+   */
+  const completeDepartmentSetup = () => {
+    console.log('✅ Department setup completed');
+    setNeedsDepartmentSetup(false);
+    departmentCheckDone.current = true;
+  };
+
+  /**
+   * Đăng ký - CHỈ tạo tài khoản, KHÔNG tự động đăng nhập
+   * User phải đăng nhập lại sau khi đăng ký
    */
   const signUp = async (email, password, full_name, company_name) => {
     try {
@@ -85,39 +163,16 @@ export const AuthProvider = ({ children }) => {
         throw new Error(result.message || 'Đăng ký thất bại');
       }
 
-      // Backend trả về session và profile
+      // Đăng ký thành công - KHÔNG set session, yêu cầu đăng nhập lại
+      console.log('✅ Registration successful, user must login manually');
+      
+      // Nếu backend trả về session, sign out ngay để yêu cầu đăng nhập lại
       if (result.data?.session?.access_token) {
-        const profileData = result.data?.profile;
-        
-        // Set profile và ref TRƯỚC khi setSession
-        if (profileData) {
-          console.log('✅ Profile từ backend response:', profileData);
-          profileFromBackendRef.current = profileData;
-          setUserProfile(profileData);
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        // Set session vào Supabase client
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: result.data.session.access_token,
-          refresh_token: result.data.session.refresh_token,
-        });
-
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (sessionData.user) {
-          setUser(sessionData.user);
-          if (profileData) {
-            profileFromBackendRef.current = profileData;
-            setUserProfile(profileData);
-          }
-          return sessionData;
-        }
+        // Không set session, chỉ return thành công
+        console.log('📋 Session received but not setting - user must login manually');
       }
 
-      throw new Error('Không nhận được session từ server');
+      return { success: true, message: 'Đăng ký thành công!' };
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
@@ -222,7 +277,13 @@ export const AuthProvider = ({ children }) => {
           isSigningInRef.current = false;
           // Đảm bảo loading được clear ngay (không đợi onAuthStateChange)
           setLoading(false);
-          return sessionData;
+          
+          // Kiểm tra department setup và trả về kết quả
+          departmentCheckDone.current = false; // Reset để check lại
+          const needsSetup = await checkDepartmentSetup();
+          console.log('🔵 Department check result:', needsSetup ? 'needs setup' : 'already configured');
+          
+          return { ...sessionData, needsDepartmentSetup: needsSetup };
         }
 
         isSigningInRef.current = false;
@@ -412,6 +473,9 @@ export const AuthProvider = ({ children }) => {
             console.log('✅ Role:', profile.role)
             console.log('✅ Avatar URL:', profile.avatar_url)
             initialLoadDone = true; // Đánh dấu đã load xong
+            
+            // Kiểm tra department setup sau khi có profile
+            await checkDepartmentSetup();
           } else {
             console.warn('⚠️ Profile not found for user:', session.user.id);
             setUserProfile(null);
@@ -430,6 +494,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setUserProfile(null);
         profileFromBackendRef.current = null;
+        departmentCheckDone.current = false; // Reset department check flag
         if (session) {
           console.warn('⚠️ Found session but no storage keys, clearing...');
           await supabase.auth.signOut().catch(() => {});
@@ -488,6 +553,8 @@ export const AuthProvider = ({ children }) => {
             setUserProfile(profileFromBackendRef.current)
             isSigningInRef.current = false
             initialLoadDone = true
+            // Kiểm tra department setup sau khi login
+            await checkDepartmentSetup()
             setLoading(false)
             return
           }
@@ -504,6 +571,8 @@ export const AuthProvider = ({ children }) => {
               setUserProfile(currentProfile)
               console.log('✅ Profile loaded on auth state change:', currentProfile)
               initialLoadDone = true
+              // Kiểm tra department setup sau khi load profile
+              await checkDepartmentSetup()
               // CHỈ set loading = false khi đã có profile
               if (mounted) {
                 setLoading(false)
@@ -606,6 +675,11 @@ export const AuthProvider = ({ children }) => {
     loadUserProfile: reloadUserProfile,
     isAuthenticated: !!user,
     isAdmin: userProfile?.role === 'admin',
+    // Department setup
+    needsDepartmentSetup,
+    departmentsLoading,
+    completeDepartmentSetup,
+    checkDepartmentSetup,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

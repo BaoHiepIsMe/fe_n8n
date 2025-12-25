@@ -17,13 +17,17 @@ const Login = () => {
         setLoading(true);
 
         try {
-            await signIn(email, password);
+            const result = await signIn(email, password);
             
-            // Đợi một chút để đảm bảo auth state được update và loading được clear
+            // Đợi một chút để đảm bảo auth state được update
             await new Promise(resolve => setTimeout(resolve, 400));
             
-            // Navigate ngay sau khi signIn thành công
-            navigate('/dashboard', { replace: true });
+            // Kiểm tra nếu cần setup phòng ban thì redirect đến department-setup
+            if (result && result.needsDepartmentSetup) {
+                navigate('/department-setup', { replace: true });
+            } else {
+                navigate('/dashboard', { replace: true });
+            }
         } catch (err) {
             setError(err.message || 'Đăng nhập thất bại');
             setLoading(false);
