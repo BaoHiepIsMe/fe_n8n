@@ -3,6 +3,17 @@ import '../styles/dashboard.css';
 import { departmentConfigAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
+// Danh sách 7 phòng ban mặc định với category_key và department_name cố định
+const DEFAULT_DEPARTMENTS = [
+    { category_key: 'Finance & Tax', department_name: 'Phòng Tài chính - Kế toán' },
+    { category_key: 'Legal & Contracts', department_name: 'Phòng Pháp chế' },
+    { category_key: 'HR & Admin', department_name: 'Phòng Hành chính - Nhân sự' },
+    { category_key: 'Sales & CRM', department_name: 'Phòng Kinh doanh' },
+    { category_key: 'Projects & Tech', department_name: 'Phòng Kỹ thuật & Dự án' },
+    { category_key: 'Marketing', department_name: 'Phòng Marketing' },
+    { category_key: 'Other', department_name: 'Bộ phận Quản lý chung' },
+];
+
 const Settings = () => {
     const { user } = useAuth();
     const [autoClassification, setAutoClassification] = useState(true);
@@ -30,26 +41,29 @@ const Settings = () => {
             const existingDepts = result.data?.departments || result.data?.data?.departments || result.departments || [];
             console.log('Existing departments from DB:', existingDepts);
             
-            // Hiển thị TẤT CẢ các phòng ban từ database, không dùng default
-            if (existingDepts.length > 0) {
-                // Sắp xếp theo department_name để dễ nhìn
-                const sorted = existingDepts.map(dept => ({
-                    id: dept.id,
-                    department_name: dept.department_name || '',
-                    category_key: dept.category_key || '',
-                    notification_email: dept.notification_email || null,
-                })).sort((a, b) => (a.department_name || '').localeCompare(b.department_name || ''));
-                
-                console.log('Loaded departments from DB:', sorted);
-                setDepartments(sorted);
-            } else {
-                // Nếu chưa có dữ liệu, hiển thị mảng rỗng
-                console.log('No departments found in database');
-                setDepartments([]);
-            }
+            // Merge với default departments - LUÔN hiển thị đủ 7 phòng ban
+            const mergedDepts = DEFAULT_DEPARTMENTS.map(defaultDept => {
+                const existing = existingDepts.find(
+                    d => d.category_key === defaultDept.category_key
+                );
+                return {
+                    id: existing?.id || null,
+                    category_key: defaultDept.category_key,
+                    department_name: defaultDept.department_name,
+                    notification_email: existing?.notification_email || '',
+                };
+            });
+
+            console.log('Merged departments (always showing all 7):', mergedDepts);
+            setDepartments(mergedDepts);
         } catch (error) {
             console.error('Error loading departments:', error);
-            setDepartments([]);
+            // Nếu lỗi, vẫn hiển thị default với email trống
+            setDepartments(DEFAULT_DEPARTMENTS.map(d => ({
+                ...d,
+                id: null,
+                notification_email: '',
+            })));
         } finally {
             setLoading(false);
         }
@@ -57,7 +71,7 @@ const Settings = () => {
 
     const handleEmailChange = (index, email) => {
         const updated = [...departments];
-        updated[index].notification_email = email || null;
+        updated[index].notification_email = email;
         setDepartments(updated);
     };
 
@@ -71,7 +85,15 @@ const Settings = () => {
         setMessage(null);
 
         try {
-            const result = await departmentConfigAPI.updateDepartmentConfigs(departments);
+            // Chuẩn bị data để gửi - gửi tất cả 7 phòng ban
+            const dataToSave = departments.map(dept => ({
+                id: dept.id,
+                category_key: dept.category_key,
+                department_name: dept.department_name,
+                notification_email: dept.notification_email || null,
+            }));
+
+            const result = await departmentConfigAPI.updateDepartmentConfigs(dataToSave);
             
             setMessage({
                 type: 'success',
@@ -153,11 +175,6 @@ const Settings = () => {
                     <div style={{ textAlign: 'center', padding: '40px' }}>
                         <i className="fas fa-spinner fa-spin" style={{ fontSize: '24px', color: 'var(--accent)' }}></i>
                         <p style={{ marginTop: '10px', color: 'var(--text-light)' }}>Đang tải...</p>
-                    </div>
-                ) : departments.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
-                        <i className="fas fa-inbox" style={{ fontSize: '48px', marginBottom: '15px', opacity: 0.5 }}></i>
-                        <p>Chưa có phòng ban nào. Vui lòng liên hệ quản trị viên để thiết lập.</p>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>

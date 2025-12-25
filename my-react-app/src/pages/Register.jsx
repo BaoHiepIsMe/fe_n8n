@@ -33,7 +33,9 @@ const Register = () => {
 
         try {
             await signUp(email, password, fullName, companyName);
-            navigate('/settings'); // Redirect đến Settings để cấu hình email phòng ban
+            // Sau khi đăng ký thành công, yêu cầu đăng nhập
+            alert('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.');
+            navigate('/login');
         } catch (err) {
             setError(err.message || 'Đăng ký thất bại');
         } finally {
