@@ -56,6 +56,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <Link to="/esignature" className={isActive('/esignature') ? 'active' : ''} onClick={handleLinkClick}>
                     <i className="fas fa-file-signature"></i> Chữ ký số
                 </Link>
+
+                <Link to="/signatures" className={isActive('/signatures') ? 'active' : ''} onClick={handleLinkClick}>
+                    <i className="fas fa-signature"></i> Quản lý Chữ ký
+                </Link>
                 {isAdmin && (
                     <Link to="/audit" className={isActive('/audit') ? 'active' : ''} onClick={handleLinkClick}>
                         <i className="fas fa-shield-alt"></i> Audit Logs

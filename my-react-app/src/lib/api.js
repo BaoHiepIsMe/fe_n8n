@@ -4,7 +4,7 @@
  * Base URL: http://localhost:3000/api/v1
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 /**
  * Make API request với error handling
@@ -73,7 +73,9 @@ async function apiRequest(endpoint, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('❌ API Request Error:', error);
+    if (!options.silent) {
+      console.error('❌ API Request Error:', error);
+    }
     throw error;
   }
 }
@@ -349,7 +351,7 @@ export const documentAPI = {
     formData.append('data', file); // Sử dụng 'data' như trong code HTML của bạn
     formData.append('id', userId);
 
-    const webhookUrl = 'http://n8n.docsops.me/webhook/upload-file';
+    const webhookUrl = `${import.meta.env.VITE_N8N_URL || 'https://n8n.docsops.me'}/webhook/upload-file`;
     
     try {
       // Gửi request và đợi response từ n8n (như code HTML của bạn)
@@ -383,7 +385,13 @@ export const documentAPI = {
    * Get user notifications
    */
   getNotifications: async () => {
-    return await apiRequest('/documents/notifications');
+    try {
+      // Pass silent: true to avoid console error spam when N8N is offline
+      return await apiRequest('/documents/notifications', { silent: true });
+    } catch (error) {
+      console.warn('Failed to fetch notifications:', error.message);
+      return { success: true, data: { notifications: [] } };
+    }
   },
 
   /**
@@ -394,6 +402,7 @@ export const documentAPI = {
       method: 'PUT',
     });
   },
+
 };
 
 export default apiRequest;

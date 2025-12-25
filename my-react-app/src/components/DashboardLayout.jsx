@@ -9,17 +9,22 @@ const DashboardLayout = ({ children }) => {
     const { userProfile, user, signOut, loading } = useAuth();
     const navigate = useNavigate();
     const [showDropdown, setShowDropdown] = useState(false);
+
     const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+
     const [notifications, setNotifications] = useState([]);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const notificationsRef = useRef([]); // Ref để lưu notifications hiện tại cho việc so sánh
     const dropdownRef = useRef(null);
     const notificationRef = useRef(null);
+
+
     const searchRef = useRef(null);
     const searchTimeoutRef = useRef(null);
     
@@ -51,6 +56,7 @@ const DashboardLayout = ({ children }) => {
         .join('')
         .toUpperCase()
         .substring(0, 2);
+
 
     // Load notifications
     const loadNotifications = useCallback(async (silent = false) => {
@@ -155,7 +161,7 @@ const DashboardLayout = ({ children }) => {
         const interval = setInterval(() => {
             console.log('[Polling] Checking for new notifications...');
             loadNotifications(true); // Silent update - luôn load để kiểm tra thay đổi
-        }, 3000);
+        }, 15000);
         
         return () => {
             console.log('[useEffect] Cleaning up notification polling');
@@ -163,28 +169,35 @@ const DashboardLayout = ({ children }) => {
         };
     }, [user, loadNotifications]);
 
+
     // Đóng dropdown khi click outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowDropdown(false);
             }
+
             if (notificationRef.current && !notificationRef.current.contains(event.target)) {
                 setShowNotificationDropdown(false);
             }
+
             if (searchRef.current && !searchRef.current.contains(event.target)) {
                 setShowSearchResults(false);
             }
         };
 
+
         if (showDropdown || showNotificationDropdown || showSearchResults) {
+
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
+
     }, [showDropdown, showNotificationDropdown, showSearchResults]);
+
 
     // Search documents với debounce
     const performSearch = useCallback(async (query) => {
@@ -197,7 +210,9 @@ const DashboardLayout = ({ children }) => {
         setIsSearching(true);
         try {
             const result = await documentAPI.searchDocuments(query);
+
             const documents = (result.data?.documents || []).filter(doc => doc.status !== 'deleted');
+
             setSearchResults(documents);
             setShowSearchResults(documents.length > 0);
         } catch (error) {
@@ -246,6 +261,7 @@ const DashboardLayout = ({ children }) => {
         setSearchQuery('');
     };
 
+
     // Handle notification click - mark all as read
     const handleNotificationClick = useCallback(async () => {
         if (showNotificationDropdown) {
@@ -287,6 +303,7 @@ const DashboardLayout = ({ children }) => {
     };
 
     const unreadCount = notifications.filter(n => n.processing === 'sent').length;
+
 
     const handleLogout = async () => {
         try {

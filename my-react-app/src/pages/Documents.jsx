@@ -127,7 +127,6 @@ const Documents = () => {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-
             // Refresh documents, stats và folder stats sau khi upload
             await Promise.all([
                 refreshDocuments(),
