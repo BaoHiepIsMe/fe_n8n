@@ -7,7 +7,7 @@ import '../styles/dashboard.css';
 
 // URL API của bạn (Backend 1 hoặc Backend 2 tùy cấu hình proxy)
 // const API_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
-const API_URL = import.meta.env.VITE_API_URL2 || 'https://api.docsops.me/api/v1';
+const API_URL = import.meta.env.VITE_API_URL2 || 'https://api.docsops.me/api/v2';
 
 const Storage = () => {
     const { user } = useAuth(); // Lấy userId từ context
@@ -177,29 +177,7 @@ const Storage = () => {
             </div>
 
             {/* --- PHẦN STATS CŨ (GIỮ NGUYÊN) --- */}
-            {stats && (
-                <div className="storage-overview">
-                    <div className="storage-header">
-                        <div className="storage-total">
-                            {stats.totalUsedGB} GB <span>đã dùng trên {stats.totalCapacityGB} GB</span>
-                        </div>
-                        <button className="btn-sm" style={{background: 'white', border: '1px solid #e2e8f0', color: 'var(--text-dark)'}}>Nâng cấp gói</button>
-                    </div>
-                    
-                    <div className="storage-bar">
-                        <div className="sb-segment bg-docs" style={{width: `${stats.breakdown.docsPercent}%`}}></div>
-                        <div className="sb-segment bg-media" style={{width: `${stats.breakdown.mediaPercent}%`}}></div>
-                        <div className="sb-segment bg-backup" style={{width: `${stats.breakdown.backupPercent}%`}}></div>
-                    </div>
-
-                    <div className="storage-legend">
-                        <div className="legend-item"><div className="dot bg-docs"></div> Tài liệu ({stats.breakdown.docsPercent}%)</div>
-                        <div className="legend-item"><div className="dot bg-media"></div> Hình ảnh/Video ({stats.breakdown.mediaPercent}%)</div>
-                        <div className="legend-item"><div className="dot bg-backup"></div> Backup ({stats.breakdown.backupPercent}%)</div>
-                        <div className="legend-item"><div className="dot bg-other"></div> Còn trống ({100 - stats.percentUsed}%)</div>
-                    </div>
-                </div>
-            )}
+            
 
             <h3 style={{marginBottom: '20px', fontSize: '18px', marginTop: '30px'}}>Quy tắc Vòng đời đang áp dụng</h3>
             <div className="policy-grid">

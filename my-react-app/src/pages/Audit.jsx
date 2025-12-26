@@ -18,7 +18,7 @@ const Audit = () => {
     const [processing, setProcessing] = useState(false); // State loading khi bấm nút Block
 
     // --- CONFIG API URL (Dùng import.meta.env cho Vite) ---
-    const API_URL = import.meta.env.VITE_API_URL2 || 'https://api.docsops.me/api/v1';
+    const API_URL = import.meta.env.VITE_API_URL2 || 'https://api.docsops.me/api/v2';
 
     // --- FETCH DATA ---
     const fetchData = async () => {
