@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext'; // Cần auth để lấy use
 import '../styles/dashboard.css';
 
 // URL API của bạn (Backend 1 hoặc Backend 2 tùy cấu hình proxy)
-const API_URL = import.meta.env.VITE_AUDIT_API_URL || 'http://localhost:5000/api';
+// const API_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
+const API_URL = import.meta.env.VITE_API_URL2 || 'https://api.docsops.me/api/v1';
 
 const Storage = () => {
     const { user } = useAuth(); // Lấy userId từ context
@@ -49,7 +50,7 @@ const Storage = () => {
                 setCheckResult(response.data.data);
             }
         } catch (error) {
-            console.error("Lỗi kiểm tra file:", error);
+            console.error("Lỗi kiểm tra file:" + API_URL, error);
             alert("Có lỗi xảy ra khi phân tích file.");
         } finally {
             setUploading(false);
