@@ -9,9 +9,15 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'https://api.docsops.me',
         changeOrigin: true,
         secure: false,
+      },
+      '/audit-api': {
+        target: 'https://api.docsops.me',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/audit-api/, '/api/v2'),
       }
     }
   }
