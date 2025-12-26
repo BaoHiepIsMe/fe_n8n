@@ -98,6 +98,15 @@ const SignDocumentPage = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Auto-render PDF when loading finishes
+  useEffect(() => {
+    if (pdfDoc && !loading) {
+      setTimeout(() => {
+        renderPage(pdfDoc, currentPage);
+      }, 100);
+    }
+  }, [pdfDoc, loading, currentPage]);
+
   const loadRequestDetails = async () => {
     setLoading(true);
     try {
@@ -140,7 +149,7 @@ const SignDocumentPage = () => {
         const pdf = await loadingTask.promise;
         setPdfDoc(pdf);
         setTotalPages(pdf.numPages);
-        renderPage(pdf, 1);
+        // renderPage(pdf, 1); -> Removed: Canvas not ready yet
       }
     } catch (err) {
       console.error('Load PDF error:', err);

@@ -109,8 +109,8 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setTotalPages(pdf.numPages);
       setCurrentPage(1);
 
-      // Render first page
-      await renderPage(pdf, 1);
+      // Render first page (moved to useEffect monitoring step)
+      // await renderPage(pdf, 1);
 
       // Upload to storage and create document record
       setUploadStatus('uploading');
@@ -642,10 +642,13 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
   }, [isOpen]);
 
   useEffect(() => {
-    if (pdfDoc) {
-      renderPage(pdfDoc, currentPage);
+    if (pdfDoc && step >= 2) {
+      // setTimeout ensures DOM is completely ready (specifically containerRef size)
+      setTimeout(() => {
+        renderPage(pdfDoc, currentPage);
+      }, 100);
     }
-  }, [pdfDoc, currentPage, currentScale]);
+  }, [pdfDoc, currentPage, currentScale, step]);
 
   useEffect(() => {
     if (positionPreset !== 'custom' && canvasRef.current) {
