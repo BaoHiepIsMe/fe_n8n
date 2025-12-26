@@ -13,7 +13,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
 
 const SignatureManagement = () => {
   // State for signature creation
@@ -23,26 +23,26 @@ const SignatureManagement = () => {
   const [pin, setPin] = useState('');
   const [label, setLabel] = useState('My Signature');
   const [isDefault, setIsDefault] = useState(true);
-  
+
   // State for signatures list
   const [signatures, setSignatures] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  
+
   // State for drawing
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
-  
+
   // Refs
   const canvasRef = useRef(null);
-  
+
   // Get access token
   const getAccessToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   };
-  
+
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -56,19 +56,19 @@ const SignatureManagement = () => {
       ctx.lineJoin = 'round';
     }
   }, [signatureType]);
-  
+
   // Load signatures on mount
   useEffect(() => {
     loadSignatures();
   }, []);
-  
+
   // Drawing handlers
   const getPosition = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    
+
     if (e.touches) {
       return {
         x: (e.touches[0].clientX - rect.left) * scaleX,
@@ -80,34 +80,34 @@ const SignatureManagement = () => {
       y: (e.clientY - rect.top) * scaleY
     };
   };
-  
+
   const startDrawing = (e) => {
     e.preventDefault();
     setIsDrawing(true);
     const pos = getPosition(e);
     setLastPos(pos);
   };
-  
+
   const draw = useCallback((e) => {
     if (!isDrawing) return;
     e.preventDefault();
-    
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const pos = getPosition(e);
-    
+
     ctx.beginPath();
     ctx.moveTo(lastPos.x, lastPos.y);
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-    
+
     setLastPos(pos);
   }, [isDrawing, lastPos]);
-  
+
   const stopDrawing = () => {
     setIsDrawing(false);
   };
-  
+
   // Clear canvas
   const clearCanvas = () => {
     const canvas = canvasRef.current;
@@ -117,7 +117,7 @@ const SignatureManagement = () => {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
   };
-  
+
   // Convert canvas to blob
   const canvasToBlob = () => {
     return new Promise((resolve) => {
@@ -131,41 +131,41 @@ const SignatureManagement = () => {
       }, 'image/png', 1.0);
     });
   };
-  
+
   // Convert text to image blob
   const textToImageBlob = async (text) => {
     const canvas = document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 120;
     const ctx = canvas.getContext('2d');
-    
+
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     ctx.font = 'italic 48px "Dancing Script", cursive, serif';
     ctx.fillStyle = '#1a1a2e';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    
+
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         resolve(blob);
       }, 'image/png', 1.0);
     });
   };
-  
+
   // Load signatures
   const loadSignatures = async () => {
     const token = await getAccessToken();
     if (!token) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/my-signatures`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const result = await res.json();
       if (res.ok && result.data) {
         setSignatures(result.data);
@@ -176,19 +176,19 @@ const SignatureManagement = () => {
       setLoading(false);
     }
   };
-  
+
   // Create signature
   const createSignature = async () => {
     setError(null);
     setSuccess(null);
-    
+
     if (!pin || pin.length < 4) {
       setError('PIN phải có ít nhất 4 ký tự');
       return;
     }
-    
+
     let imageBlob;
-    
+
     // Get image based on type
     if (signatureType === 'drawn') {
       imageBlob = await canvasToBlob();
@@ -209,31 +209,31 @@ const SignatureManagement = () => {
       }
       imageBlob = await textToImageBlob(typedText);
     }
-    
+
     setLoading(true);
-    
+
     try {
       const token = await getAccessToken();
-      
+
       const formData = new FormData();
       formData.append('signatureImage', imageBlob, 'signature.png');
       formData.append('signatureType', signatureType);
       formData.append('pin', pin);
       if (label) formData.append('label', label);
       formData.append('isDefault', isDefault.toString());
-      
+
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/create`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+
       const result = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(result.message || 'Không thể tạo chữ ký');
       }
-      
+
       setSuccess('Tạo chữ ký thành công!');
       clearCanvas();
       setTypedText('');
@@ -245,18 +245,18 @@ const SignatureManagement = () => {
       setLoading(false);
     }
   };
-  
+
   // Set default signature
   const setDefaultSignature = async (signatureId) => {
     const token = await getAccessToken();
     if (!token) return;
-    
+
     try {
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/${signatureId}/set-default`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (res.ok) {
         setSuccess('Đã đặt làm chữ ký mặc định');
         loadSignatures();
@@ -265,20 +265,20 @@ const SignatureManagement = () => {
       setError(err.message);
     }
   };
-  
+
   // Delete signature
   const deleteSignature = async (signatureId) => {
     if (!confirm('Bạn có chắc muốn xóa chữ ký này?')) return;
-    
+
     const token = await getAccessToken();
     if (!token) return;
-    
+
     try {
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/${signatureId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (res.ok) {
         setSuccess('Đã xóa chữ ký');
         loadSignatures();
@@ -287,7 +287,7 @@ const SignatureManagement = () => {
       setError(err.message);
     }
   };
-  
+
   return (
     <div className="signature-management" style={styles.container}>
       {/* Header */}
@@ -298,7 +298,7 @@ const SignatureManagement = () => {
         </h2>
         <p style={styles.subtitle}>Tạo và quản lý chữ ký cá nhân của bạn</p>
       </div>
-      
+
       {/* Messages */}
       {error && (
         <div style={styles.error}>
@@ -310,13 +310,13 @@ const SignatureManagement = () => {
           <i className="fas fa-check-circle"></i> {success}
         </div>
       )}
-      
+
       {/* Main content */}
       <div style={styles.content}>
         {/* Left: Create Signature */}
         <div style={styles.createSection}>
           <h3 style={styles.sectionTitle}>✍️ Tạo chữ ký mới</h3>
-          
+
           {/* Signature Type */}
           <div style={styles.field}>
             <label style={styles.label}>Loại chữ ký</label>
@@ -340,7 +340,7 @@ const SignatureManagement = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Drawing Canvas */}
           {signatureType === 'drawn' && (
             <div style={styles.field}>
@@ -365,7 +365,7 @@ const SignatureManagement = () => {
               </button>
             </div>
           )}
-          
+
           {/* Upload File */}
           {signatureType === 'uploaded' && (
             <div style={styles.field}>
@@ -381,7 +381,7 @@ const SignatureManagement = () => {
               )}
             </div>
           )}
-          
+
           {/* Typed Text */}
           {signatureType === 'typed' && (
             <div style={styles.field}>
@@ -398,7 +398,7 @@ const SignatureManagement = () => {
               )}
             </div>
           )}
-          
+
           {/* Label */}
           <div style={styles.field}>
             <label style={styles.label}>Tên chữ ký (tùy chọn)</label>
@@ -410,7 +410,7 @@ const SignatureManagement = () => {
               style={styles.input}
             />
           </div>
-          
+
           {/* PIN */}
           <div style={styles.field}>
             <label style={styles.label}>Mã PIN (bảo mật)</label>
@@ -423,7 +423,7 @@ const SignatureManagement = () => {
               style={styles.pinInput}
             />
           </div>
-          
+
           {/* Default checkbox */}
           <div style={styles.checkbox}>
             <input
@@ -437,7 +437,7 @@ const SignatureManagement = () => {
               Đặt làm chữ ký mặc định
             </label>
           </div>
-          
+
           {/* Submit button */}
           <button
             onClick={createSignature}
@@ -458,7 +458,7 @@ const SignatureManagement = () => {
             )}
           </button>
         </div>
-        
+
         {/* Right: Signatures List */}
         <div style={styles.listSection}>
           <div style={styles.listHeader}>
@@ -467,7 +467,7 @@ const SignatureManagement = () => {
               <i className="fas fa-sync-alt"></i>
             </button>
           </div>
-          
+
           {loading ? (
             <div style={styles.loading}>
               <i className="fas fa-spinner fa-spin"></i> Đang tải...

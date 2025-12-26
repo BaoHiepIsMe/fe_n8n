@@ -8,8 +8,9 @@ import "../styles/dashboard.css";
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://api.docsops.me/api/v1";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
+
 
 const ViewDocumentPage = () => {
   const { requestId } = useParams();
@@ -23,7 +24,9 @@ const ViewDocumentPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pdfScale, setPdfScale] = useState(1);
+
   const [fileUrl, setFileUrl] = useState(null);
+
 
   // Refs
   const canvasRef = useRef(null);
@@ -53,7 +56,9 @@ const ViewDocumentPage = () => {
               import.meta.env.VITE_API_KEY || "esign-secure-api-key-2024",
           },
         }
+
       );
+
 
       const result = await res.json();
 
@@ -78,9 +83,9 @@ const ViewDocumentPage = () => {
 
   const loadPdf = async (storagePath) => {
     try {
-      const { data } = supabase.storage
-        .from("documents")
-        .getPublicUrl(storagePath);
+
+      const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
+
 
       if (data?.publicUrl) {
         setFileUrl(data.publicUrl);
@@ -354,6 +359,7 @@ const ViewDocumentPage = () => {
                   </div>
                 ))}
               </div>
+
             </div>
           </div>
         </div>

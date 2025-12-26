@@ -14,13 +14,13 @@ import '../styles/dashboard.css';
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
 
 const SignDocumentPage = () => {
   const [searchParams] = useSearchParams();
   const requestId = searchParams.get('requestId');
   const signerId = searchParams.get('signerId');
-  
+
   // State
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,7 +29,7 @@ const SignDocumentPage = () => {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  
+
   // Signature state
   const [signatures, setSignatures] = useState([]);
   const [selectedSignature, setSelectedSignature] = useState(null);
@@ -39,7 +39,7 @@ const SignDocumentPage = () => {
   const [isSigning, setIsSigning] = useState(false);
   const [signSuccess, setSignSuccess] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState(null);
-  
+
   // Drag & Resize state
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -47,20 +47,20 @@ const SignDocumentPage = () => {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0 });
   const [initialSignatureSize, setInitialSignatureSize] = useState({ width: 0, height: 0 });
   const [pdfScale, setPdfScale] = useState(1);
-  
+
   // User auth
   const [user, setUser] = useState(null);
   const [needsAuth, setNeedsAuth] = useState(false);
-  
+
   // Refs
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  
+
   // Logic checks
   // const isCreator = user && request?.creator_id === user.id;
   // const mySignerRecord = user && request?.signers?.find(s => s.signer_id === user.id || s.signer_email === user.email);
   const isCompleted = request?.status === 'signed';
-  
+
   const urlEmail = searchParams.get('email');
   const urlSenderEmail = searchParams.get('senderEmail');
 
@@ -73,7 +73,7 @@ const SignDocumentPage = () => {
     }
     loadRequestDetails();
   }, [requestId, signerId]);
-  
+
   // Check auth
   useEffect(() => {
     const checkAuth = async () => {
@@ -84,7 +84,7 @@ const SignDocumentPage = () => {
       }
     };
     checkAuth();
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -94,10 +94,10 @@ const SignDocumentPage = () => {
         setUser(null);
       }
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
-  
+
   const loadRequestDetails = async () => {
     setLoading(true);
     try {
@@ -107,17 +107,17 @@ const SignDocumentPage = () => {
           'X-API-Key': import.meta.env.VITE_API_KEY || 'esign-secure-api-key-2024'
         }
       });
-      
+
       const result = await res.json();
       console.log('API Response Data:', result.data); // DEBUG LOG
-      
+
       if (!res.ok || !result.success) {
         throw new Error(result.message || 'Không thể tải thông tin yêu cầu');
       }
-      
+
       setRequest(result.data);
       setDocument(result.data.document);
-      
+
       // Load PDF
       if (result.data.document?.storage_path) {
         await loadPdf(result.data.document.storage_path);
@@ -129,12 +129,12 @@ const SignDocumentPage = () => {
       setLoading(false);
     }
   };
-  
+
   const loadPdf = async (storagePath) => {
     try {
       // Get PDF URL from Supabase storage
       const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
-      
+
       if (data?.publicUrl) {
         const loadingTask = pdfjsLib.getDocument(data.publicUrl);
         const pdf = await loadingTask.promise;
@@ -147,33 +147,33 @@ const SignDocumentPage = () => {
       setError('Không thể tải tài liệu PDF');
     }
   };
-  
+
   const renderPage = async (pdf, pageNum) => {
     if (!pdf || !canvasRef.current || !containerRef.current) return;
-    
+
     try {
       const page = await pdf.getPage(pageNum);
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       const container = containerRef.current;
-      
+
       const containerWidth = container.clientWidth - 32;
       const containerHeight = 700; // Hoặc calculate dynamic height nếu muốn
-      
+
       const originalViewport = page.getViewport({ scale: 1 });
       const scaleX = containerWidth / originalViewport.width;
       // const scaleY = containerHeight / originalViewport.height; 
       // Không cần scaleY vì PDF thường scroll vertical
-      
+
       const fitScale = Math.min(scaleX, 1.5); // Max scale 1.5
       setPdfScale(fitScale);
-      
+
       const viewport = page.getViewport({ scale: fitScale });
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       await page.render({
         canvasContext: ctx,
         viewport: viewport
@@ -182,78 +182,78 @@ const SignDocumentPage = () => {
       console.error('Render error:', err);
     }
   };
-  
+
   // Drag handling
   const handleDragStart = (e) => {
     e.preventDefault();
     e.stopPropagation(); // Stop propagation to prevent canvas drag
     setIsDragging(true);
-    
+
     const clientX = e.clientX || e.touches?.[0]?.clientX;
     const clientY = e.clientY || e.touches?.[0]?.clientY;
-    
-    setDragStart({ 
-      x: clientX - signaturePosition.x, 
-      y: clientY - signaturePosition.y 
+
+    setDragStart({
+      x: clientX - signaturePosition.x,
+      y: clientY - signaturePosition.y
     });
   };
-  
+
   // Resize handling
   const handleResizeStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
-    
+
     const clientX = e.clientX || e.touches?.[0]?.clientX;
     const clientY = e.clientY || e.touches?.[0]?.clientY;
-    
+
     setResizeStart({ x: clientX, y: clientY });
     setInitialSignatureSize({ ...signatureSize });
   };
-  
+
   // Global Move/Up handlers (attach to window/document)
   useEffect(() => {
     const handleMove = (e) => {
       if (!isDragging && !isResizing) return;
-      
+
       const clientX = e.clientX || e.touches?.[0]?.clientX;
       const clientY = e.clientY || e.touches?.[0]?.clientY;
-      
+
       if (isDragging) {
         const canvas = canvasRef.current;
         const container = containerRef.current;
         if (!canvas || !container) return;
-        
+
         const canvasRect = canvas.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        
+
         const canvasOffsetX = canvasRect.left - containerRect.left;
         const canvasOffsetY = canvasRect.top - containerRect.top;
-        
+
         let newX = clientX - dragStart.x;
         let newY = clientY - dragStart.y;
-        
+
         // Constrain
         const minX = canvasOffsetX;
         const minY = canvasOffsetY;
         const maxX = canvasOffsetX + canvasRect.width - signatureSize.width;
         const maxY = canvasOffsetY + canvasRect.height - signatureSize.height;
-        
+
         newX = Math.max(minX, Math.min(newX, maxX));
         newY = Math.max(minY, Math.min(newY, maxY));
-        
+
         setSignaturePosition({ x: newX, y: newY });
       } else if (isResizing) {
         // Calculate new size
         const deltaX = clientX - resizeStart.x;
         const deltaY = clientY - resizeStart.y;
-        
+
         // Giữ tỷ lệ aspect ratio
         const aspectRatio = initialSignatureSize.width / initialSignatureSize.height;
-        
+
         let newWidth = initialSignatureSize.width + deltaX;
         let newHeight = newWidth / aspectRatio;
-        
+
         // Limits
         if (newWidth < 50) {
           newWidth = 50;
@@ -263,23 +263,23 @@ const SignDocumentPage = () => {
           newWidth = 400;
           newHeight = 400 / aspectRatio;
         }
-        
+
         setSignatureSize({ width: newWidth, height: newHeight });
       }
     };
-    
+
     const handleUp = () => {
       setIsDragging(false);
       setIsResizing(false);
     };
-    
+
     if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMove);
       window.addEventListener('mouseup', handleUp);
       window.addEventListener('touchmove', handleMove);
       window.addEventListener('touchend', handleUp);
     }
-    
+
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
@@ -287,13 +287,13 @@ const SignDocumentPage = () => {
       window.removeEventListener('touchend', handleUp);
     };
   }, [isDragging, isResizing, dragStart, resizeStart, initialSignatureSize, signatureSize]);
-  
+
   const loadUserSignatures = async (token) => {
     try {
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/my-signatures`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const result = await res.json();
       if (res.ok && result.data && result.data.length > 0) {
         setSignatures(result.data);
@@ -304,7 +304,7 @@ const SignDocumentPage = () => {
       console.error('Load signatures error:', err);
     }
   };
-  
+
   const handleLogin = async (email, password) => {
     setError(null);
     setSuccessMessage('');
@@ -317,24 +317,24 @@ const SignDocumentPage = () => {
       setError(err.message);
     }
   };
-  
+
   // State for success message
   const [successMessage, setSuccessMessage] = useState('');
-  
+
   const handleRegister = async (email, password) => {
     setError(null);
     setSuccessMessage('');
     try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
+      const { data, error } = await supabase.auth.signUp({
+        email,
         password,
         options: {
           emailRedirectTo: window.location.href // Redirect back to this page after email confirmation
         }
       });
-      
+
       if (error) throw error;
-      
+
       if (data.user && data.session) {
         // Nếu auto-confirm được bật, user đã đăng nhập ngay
         setUser(data.user);
@@ -348,29 +348,29 @@ const SignDocumentPage = () => {
       setError(err.message);
     }
   };
-  
+
   const handleSignDocument = async () => {
     if (!user) {
       setNeedsAuth(true);
       return;
     }
-    
+
     if (!selectedSignature) {
       setError('Vui lòng chọn chữ ký');
       return;
     }
-    
+
     if (!pin || pin.length < 4) {
       setError('Vui lòng nhập mã PIN (ít nhất 4 ký tự)');
       return;
     }
-    
+
     setIsSigning(true);
     setError(null);
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       // Tính toán tọa độ chuẩn hóa trên PDF gốc
       const canvas = canvasRef.current;
       const container = containerRef.current;
@@ -378,23 +378,23 @@ const SignDocumentPage = () => {
       let pdfY = 0;
       let pdfWidth = signatureSize.width;
       let pdfHeight = signatureSize.height;
-      
+
       if (canvas && container) {
         const canvasRect = canvas.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        
+
         const canvasOffsetX = canvasRect.left - containerRect.left;
         const canvasOffsetY = canvasRect.top - containerRect.top;
-        
+
         const relativeX = signaturePosition.x - canvasOffsetX;
         const relativeY = signaturePosition.y - canvasOffsetY;
-        
+
         pdfX = relativeX / pdfScale;
         pdfY = relativeY / pdfScale;
         pdfWidth = signatureSize.width / pdfScale;
         pdfHeight = signatureSize.height / pdfScale;
       }
-      
+
       // Sign the document
       const res = await fetch(`${API_BASE_URL}/e-signature/documents/${document.id}/sign`, {
         method: 'POST',
@@ -413,32 +413,32 @@ const SignDocumentPage = () => {
             y: Math.round(pdfY),
             width: Math.round(pdfWidth),
             height: Math.round(pdfHeight)
-          } 
+          }
         })
       });
-      
+
       const result = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(result.message || 'Không thể ký tài liệu');
       }
-      
+
       // Lưu URL file đã ký để hiển thị nút download
       let finalSignedUrl = null;
       if (result.data) {
-         if (result.data.signedPdfUrl) {
-           finalSignedUrl = result.data.signedPdfUrl;
-           setSignedPdfUrl(result.data.signedPdfUrl);
-         } else if (result.data.document && result.data.document.url) {
-           finalSignedUrl = result.data.document.url;
-           setSignedPdfUrl(result.data.document.url);
-         }
+        if (result.data.signedPdfUrl) {
+          finalSignedUrl = result.data.signedPdfUrl;
+          setSignedPdfUrl(result.data.signedPdfUrl);
+        } else if (result.data.document && result.data.document.url) {
+          finalSignedUrl = result.data.document.url;
+          setSignedPdfUrl(result.data.document.url);
+        }
       }
-      
+
       // Update state request to ensure UI has latest info
       // Gửi thông báo cho người gửi (creator) - Đã chuyển sang Backend
       // Để đảm bảo bảo mật và reliability.
-      
+
       // Update local state is handled below or by re-fetching if needed
 
       // Fallback: Nếu chưa có URL, fetch lại thông tin mới nhất từ server
@@ -451,22 +451,22 @@ const SignDocumentPage = () => {
             }
           });
           const refreshData = await refreshRes.json();
-          
+
           if (refreshData.success && refreshData.data.document && refreshData.data.document.storage_path) {
-             const { data: urlData } = supabase.storage
-               .from('documents')
-               .getPublicUrl(refreshData.data.document.storage_path);
-               
-             if (urlData?.publicUrl) {
-               console.log('Updated signed URL:', urlData.publicUrl);
-               setSignedPdfUrl(urlData.publicUrl);
-             }
+            const { data: urlData } = supabase.storage
+              .from('documents')
+              .getPublicUrl(refreshData.data.document.storage_path);
+
+            if (urlData?.publicUrl) {
+              console.log('Updated signed URL:', urlData.publicUrl);
+              setSignedPdfUrl(urlData.publicUrl);
+            }
           }
         } catch (refreshErr) {
           console.error('Failed to refresh document info:', refreshErr);
         }
       }
-      
+
       setSignSuccess(true);
     } catch (err) {
       console.error('Sign error:', err);
@@ -475,7 +475,7 @@ const SignDocumentPage = () => {
       setIsSigning(false);
     }
   };
-  
+
   // Render success state
   if (signSuccess) {
     return (
@@ -491,7 +491,7 @@ const SignDocumentPage = () => {
           <p style={styles.successText}>
             Người gửi sẽ nhận được thông báo về việc bạn đã ký.
           </p>
-          
+
           {!signedPdfUrl ? (
             <p style={{ marginTop: '20px', color: '#6366f1' }}>
               <i className="fas fa-spinner fa-spin"></i> Đang chuẩn bị file đã ký...
@@ -501,9 +501,9 @@ const SignDocumentPage = () => {
               <p style={{ margin: '15px 0 5px', fontSize: '14px', color: '#666' }}>
                 File này chứa chữ ký của tất cả các bên.
               </p>
-              <a 
-                href={signedPdfUrl} 
-                target="_blank" 
+              <a
+                href={signedPdfUrl}
+                target="_blank"
                 rel="noopener noreferrer"
                 style={{
                   display: 'inline-block',
@@ -524,9 +524,9 @@ const SignDocumentPage = () => {
               </a>
             </div>
           )}
-          
+
           <div style={{ marginTop: '20px' }}>
-            <button 
+            <button
               onClick={() => window.close()}
               style={styles.closeBtn}
             >
@@ -537,7 +537,7 @@ const SignDocumentPage = () => {
       </div>
     );
   }
-  
+
   // Render loading state
   if (loading) {
     return (
@@ -549,7 +549,7 @@ const SignDocumentPage = () => {
       </div>
     );
   }
-  
+
   // Render error state
   if (error && !request) {
     return (
@@ -562,7 +562,7 @@ const SignDocumentPage = () => {
       </div>
     );
   }
-  
+
   // Render login/register form if needed
   if (needsAuth && !user) {
     return (
@@ -572,8 +572,8 @@ const SignDocumentPage = () => {
           <p style={styles.authText}>
             Để ký tài liệu "{document?.title}"
           </p>
-          <AuthForm 
-            onLogin={handleLogin} 
+          <AuthForm
+            onLogin={handleLogin}
             onRegister={handleRegister}
             error={error}
             successMessage={successMessage}
@@ -583,7 +583,7 @@ const SignDocumentPage = () => {
       </div>
     );
   }
-  
+
   return (
     <div style={styles.pageContainer}>
       {/* Header */}
@@ -600,7 +600,7 @@ const SignDocumentPage = () => {
           )}
         </div>
       </header>
-      
+
       {/* Main content */}
       <main style={styles.main}>
         {/* Document info */}
@@ -621,13 +621,13 @@ const SignDocumentPage = () => {
               Hạn chót: {new Date(request.expires_at).toLocaleDateString('vi-VN')}
             </p>
           )}
-          
-          <div style={{...styles.docMessage, backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', marginTop: '10px'}}>
-             <i className="fas fa-user-circle" style={{ marginRight: '8px' }}></i>
-             Tạo bởi: <strong>{request?.creator?.email || 'Không tìm thấy email người tạo'}</strong>
+
+          <div style={{ ...styles.docMessage, backgroundColor: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', marginTop: '10px' }}>
+            <i className="fas fa-user-circle" style={{ marginRight: '8px' }}></i>
+            Tạo bởi: <strong>{request?.creator?.email || 'Không tìm thấy email người tạo'}</strong>
           </div>
         </div>
-        
+
         <div style={styles.contentGrid}>
           {/* PDF Preview */}
           <div style={styles.previewSection}>
@@ -635,13 +635,13 @@ const SignDocumentPage = () => {
               <span>📄 Xem trước tài liệu - Kéo thả chữ ký để chọn vị trí</span>
               <span>Trang {currentPage}/{totalPages}</span>
             </div>
-            
+
             <div style={styles.canvasContainer} ref={containerRef}>
               <canvas ref={canvasRef} style={styles.canvas}></canvas>
-              
+
               {/* Signature overlay */}
               {selectedSignature && (
-                <div 
+                <div
                   onMouseDown={handleDragStart}
                   onTouchStart={handleDragStart}
                   style={{
@@ -657,12 +657,12 @@ const SignDocumentPage = () => {
                     userSelect: 'none'
                   }}
                 >
-                  <img 
-                    src={selectedSignature.image_url} 
+                  <img
+                    src={selectedSignature.image_url}
                     alt="Signature"
                     style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
                   />
-                  
+
                   {/* Resize handle */}
                   <div
                     onMouseDown={handleResizeStart}
@@ -683,10 +683,10 @@ const SignDocumentPage = () => {
                 </div>
               )}
             </div>
-            
+
             {/* Page navigation */}
             <div style={styles.pageNav}>
-              <button 
+              <button
                 onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); if (pdfDoc) renderPage(pdfDoc, currentPage - 1); }}
                 disabled={currentPage <= 1}
                 style={styles.navBtn}
@@ -694,7 +694,7 @@ const SignDocumentPage = () => {
                 ← Trang trước
               </button>
               <span>Trang {currentPage} / {totalPages}</span>
-              <button 
+              <button
                 onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); if (pdfDoc) renderPage(pdfDoc, currentPage + 1); }}
                 disabled={currentPage >= totalPages}
                 style={styles.navBtn}
@@ -703,24 +703,24 @@ const SignDocumentPage = () => {
               </button>
             </div>
           </div>
-          
+
           {/* Signing panel */}
           <div style={styles.signPanel}>
             <h3 style={styles.panelTitle}>✍️ Ký tài liệu</h3>
-            
+
             {error && (
               <div style={styles.errorMessage}>
                 <i className="fas fa-exclamation-circle"></i> {error}
               </div>
             )}
-            
+
             {/* Select signature */}
             <div style={styles.section}>
               <label style={styles.label}>Chọn chữ ký của bạn</label>
               {signatures.length > 0 ? (
                 <div style={styles.signatureList}>
                   {signatures.map(sig => (
-                    <div 
+                    <div
                       key={sig.id}
                       onClick={() => setSelectedSignature(sig)}
                       style={{
@@ -739,7 +739,7 @@ const SignDocumentPage = () => {
                 </p>
               )}
             </div>
-            
+
             {/* PIN input */}
             <div style={styles.section}>
               <label style={styles.label}>Mã PIN xác thực</label>
@@ -752,7 +752,7 @@ const SignDocumentPage = () => {
                 style={styles.pinInput}
               />
             </div>
-            
+
             {/* Sign button */}
             <button
               onClick={handleSignDocument}
@@ -772,7 +772,7 @@ const SignDocumentPage = () => {
                 </>
               )}
             </button>
-            
+
             <p style={styles.legalNote}>
               Bằng cách ký tài liệu này, bạn đồng ý rằng chữ ký điện tử có giá trị pháp lý tương đương với chữ ký tay.
             </p>
@@ -790,7 +790,7 @@ const AuthForm = ({ onLogin, onRegister, error, successMessage, initialEmail }) 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -801,17 +801,17 @@ const AuthForm = ({ onLogin, onRegister, error, successMessage, initialEmail }) 
     }
     setLoading(false);
   };
-  
+
   return (
     <form onSubmit={handleSubmit} style={styles.loginForm}>
       {error && (
         <div style={styles.errorMessage}>{error}</div>
       )}
-      
+
       {successMessage && (
         <div style={styles.successMessage}>{successMessage}</div>
       )}
-      
+
       <input
         type="email"
         value={email}
@@ -820,7 +820,7 @@ const AuthForm = ({ onLogin, onRegister, error, successMessage, initialEmail }) 
         required
         style={styles.input}
       />
-      
+
       <input
         type="password"
         value={password}
@@ -830,11 +830,11 @@ const AuthForm = ({ onLogin, onRegister, error, successMessage, initialEmail }) 
         minLength={6}
         style={styles.input}
       />
-      
+
       <button type="submit" disabled={loading} style={styles.loginBtn}>
         {loading ? 'Đang xử lý...' : (isRegister ? 'Đăng ký' : 'Đăng nhập')}
       </button>
-      
+
       <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '14px', color: '#6b7280' }}>
         {isRegister ? 'Đã có tài khoản? ' : 'Chưa có tài khoản? '}
         <button

@@ -413,10 +413,10 @@
 import { supabase } from './supabase';
 
 // --- CẤU HÌNH BACKEND 1 (Main App - Port 3000) ---
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
 
 // --- CẤU HÌNH BACKEND 2 (Audit Service - Port 5000) ---
-const AUDIT_API_BASE_URL = import.meta.env.VITE_API_AUDIT_URL || 'http://localhost:5000/api';
+const AUDIT_API_BASE_URL = import.meta.env.VITE_API_AUDIT_URL || '/audit-api';
 
 /**
  * Make API request cho Backend 1

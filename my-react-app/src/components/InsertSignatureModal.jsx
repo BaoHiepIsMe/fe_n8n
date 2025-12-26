@@ -16,7 +16,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
 const N8N_URL = import.meta.env.VITE_N8N_URL || 'https://n8n.docsops.me';
 
 const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
@@ -28,22 +28,22 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
   const [currentScale, setCurrentScale] = useState(1.0);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
-  
+
   // State for signature
   const [signatures, setSignatures] = useState([]);
   const [selectedSignature, setSelectedSignature] = useState(null);
   const [signaturePosition, setSignaturePosition] = useState({ x: 350, y: 700 });
   const [signatureSize, setSignatureSize] = useState({ width: 120, height: 60 });
   const [positionPreset, setPositionPreset] = useState('bottom-right');
-  
+
   // State for AI Detection
   const [aiDetectedPositions, setAiDetectedPositions] = useState([]);
   const [isDetecting, setIsDetecting] = useState(false);
-  
+
   // State for drag
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  
+
   // State for UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -51,19 +51,19 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
   const [pin, setPin] = useState('');
   const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
   const [uploadMessage, setUploadMessage] = useState('');
-  
+
   // State for sending signature request
   const [signedDocumentResult, setSignedDocumentResult] = useState(null);
   const [signatories, setSignatories] = useState([{ email: '', name: '', order: 1 }]);
   const [requestMessage, setRequestMessage] = useState('Vui lòng ký vào tài liệu này.');
   const [deadline, setDeadline] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
-  
+
   // Refs
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
   const containerRef = useRef(null);
-  
+
   // Get access token
   const getAccessToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -74,50 +74,50 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
   const handlePdfUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setError('File phải có đuôi .pdf');
       return;
     }
-    
+
     if (file.size > 10 * 1024 * 1024) {
       setError('File quá lớn (tối đa 10MB)');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const arrayBuffer = await file.arrayBuffer();
       const header = new Uint8Array(arrayBuffer.slice(0, 5));
       const headerString = String.fromCharCode(...header);
-      
+
       if (headerString !== '%PDF-') {
         throw new Error('File không phải PDF hợp lệ');
       }
-      
+
       const pdfDataArray = new Uint8Array(arrayBuffer);
       setPdfData(pdfDataArray);
       setUploadedFile(file);
-      
+
       // Load PDF for preview
       const loadingTask = pdfjsLib.getDocument({ data: pdfDataArray });
       const pdf = await loadingTask.promise;
-      
+
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       setCurrentPage(1);
-      
+
       // Render first page
       await renderPage(pdf, 1);
-      
+
       // Upload to storage and create document record
       setUploadStatus('uploading');
       setUploadMessage('Đang upload file lên server...');
-      
+
       const uploadSuccess = await uploadToStorageAndCreateRecord(file);
-      
+
       if (uploadSuccess) {
         setUploadStatus('success');
         setUploadMessage('✅ File đã được upload thành công! Bạn có thể sử dụng AI Detection.');
@@ -135,7 +135,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
-  
+
   // Upload to storage and create document record
   const uploadToStorageAndCreateRecord = async (file) => {
     const token = await getAccessToken();
@@ -143,34 +143,34 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setUploadMessage('⚠️ Bạn cần đăng nhập để upload file');
       return false;
     }
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setUploadMessage('⚠️ Không tìm thấy thông tin người dùng');
         return false;
       }
-      
+
       setUploadMessage('📤 Đang upload file lên storage...');
-      
+
       // Upload to storage
       const formData = new FormData();
       formData.append('files', file);
-      
+
       const uploadRes = await fetch(`${API_BASE_URL}/documents/upload-to-queue`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+
       const uploadResult = await uploadRes.json();
       if (!uploadRes.ok) {
         throw new Error(uploadResult.message || 'Upload to storage failed');
       }
-      
+
       const uploadedDoc = uploadResult.data.uploaded[0];
       setUploadMessage('📝 Đang tạo document record...');
-      
+
       // Create document record
       const createRes = await fetch(`${API_BASE_URL}/e-signature-ext/internal/create-test-request`, {
         method: 'POST',
@@ -187,7 +187,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
           title: file.name
         })
       });
-      
+
       const createResult = await createRes.json();
       if (createRes.ok && createResult.data) {
         setCurrentDocumentId(createResult.data.document.id);
@@ -202,88 +202,88 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       return false;
     }
   };
-  
+
   const [pdfScale, setPdfScale] = useState(1);
 
   // Render PDF page - auto fit vào container
   const renderPage = async (pdf, pageNum) => {
     if (!pdf || !canvasRef.current || !containerRef.current) return;
-    
+
     try {
       const page = await pdf.getPage(pageNum);
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       const container = containerRef.current;
-      
+
       // Lấy kích thước container (trừ padding)
       const containerWidth = container.clientWidth - 32; // padding 16px mỗi bên
       const containerHeight = container.clientHeight - 32;
-      
+
       // Lấy kích thước gốc của page (scale 1)
       const originalViewport = page.getViewport({ scale: 1 });
-      
+
       // Tính scale để fit vào container (giữ tỷ lệ A4)
       const scaleX = containerWidth / originalViewport.width;
       const scaleY = containerHeight / originalViewport.height;
       const fitScale = Math.min(scaleX, scaleY, 2.2); // max 2.2 để preview lớn hơn
-      
+
       setPdfScale(fitScale); // Lưu scale factor
-      
+
       // Áp dụng scale
       const viewport = page.getViewport({ scale: fitScale });
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       await page.render({
         canvasContext: ctx,
         viewport: viewport
       }).promise;
-      
+
       console.log(`Rendered page ${pageNum} at scale ${fitScale.toFixed(2)}`);
     } catch (err) {
       console.error('Render error:', err);
     }
   };
-  
+
   // AI Detection
   const detectSignaturePositions = async () => {
     if (!currentDocumentId) {
       setError('Vui lòng upload PDF trước');
       return;
     }
-    
+
     setIsDetecting(true);
     setError(null);
-    
+
     try {
       const res = await fetch(`${N8N_URL}/webhook/e-signature/ai-detect-positions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: currentDocumentId })
       });
-      
+
       const result = await res.json();
-      
+
       if (result.success) {
         const positions = result.detectedPositions || [];
         setAiDetectedPositions(positions);
-        
+
         // Nếu chưa có chữ ký nào được chọn, tự động load
         if (!selectedSignature) {
           await loadSignatures();
         }
-        
+
         // Auto apply first position và hiển thị chữ ký lên preview
         if (positions.length > 0) {
           const firstPos = positions[0];
-          
+
           // Set position
           setSignaturePosition({ x: firstPos.x || 350, y: firstPos.y || 700 });
           setSignatureSize({ width: firstPos.width || 120, height: firstPos.height || 60 });
           setPositionPreset('custom');
-          
+
           // Navigate to the page where signature is needed
           const targetPage = firstPos.page || 1;
           if (targetPage !== currentPage) {
@@ -292,10 +292,10 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
               await renderPage(pdfDoc, targetPage);
             }
           }
-          
+
           console.log(`AI phát hiện ${positions.length} vị trí. Áp dụng vị trí đầu tiên: Trang ${targetPage}, X=${firstPos.x}, Y=${firstPos.y}`);
         }
-        
+
         setStep(3); // Chuyển sang bước chọn chữ ký và preview
       } else {
         throw new Error(result.message || 'AI detection failed');
@@ -307,40 +307,40 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setIsDetecting(false);
     }
   };
-  
+
   // Apply detected position
   const applyPosition = (pos) => {
     setSignaturePosition({ x: pos.x || 350, y: pos.y || 700 });
     setSignatureSize({ width: pos.width || 120, height: pos.height || 60 });
     setPositionPreset('custom');
-    
+
     if (pos.page && pos.page !== currentPage) {
       setCurrentPage(pos.page);
       if (pdfDoc) renderPage(pdfDoc, pos.page);
     }
   };
-  
+
   // Load user signatures - trả về signature được chọn
   const loadSignatures = async () => {
     const token = await getAccessToken();
     if (!token) return null;
-    
+
     try {
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/my-signatures`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       const result = await res.json();
       if (res.ok && result.data && result.data.length > 0) {
         setSignatures(result.data);
-        
+
         // Auto select default signature
         const defaultSig = result.data.find(s => s.is_default);
         const selectedSig = defaultSig || result.data[0];
-        
+
         setSelectedSignature(selectedSig);
         console.log('Đã chọn chữ ký mặc định:', selectedSig?.metadata?.label || 'Chữ ký');
-        
+
         return selectedSig;
       }
       return null;
@@ -349,12 +349,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       return null;
     }
   };
-  
+
   // Calculate position based on preset
   const calculatePresetPosition = (preset, canvasWidth, canvasHeight) => {
     const padding = 50;
     const { width, height } = signatureSize;
-    
+
     switch (preset) {
       case 'bottom-right':
         return { x: canvasWidth - width - padding, y: canvasHeight - height - padding };
@@ -370,50 +370,50 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
         return signaturePosition;
     }
   };
-  
+
   // Handle drag start
   const handleDragStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
-    
+
     const clientX = e.clientX || e.touches?.[0]?.clientX;
     const clientY = e.clientY || e.touches?.[0]?.clientY;
-    
+
     // Lưu offset chính xác từ điểm click đến vị trí hiện tại của signature
-    setDragStart({ 
-      x: clientX - signaturePosition.x, 
-      y: clientY - signaturePosition.y 
+    setDragStart({
+      x: clientX - signaturePosition.x,
+      y: clientY - signaturePosition.y
     });
   };
-  
+
   // Handle drag move
   const handleDragMove = useCallback((e) => {
     if (!isDragging) return;
-    
+
     const clientX = e.clientX || e.touches?.[0]?.clientX;
     const clientY = e.clientY || e.touches?.[0]?.clientY;
-    
+
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
-    
+
     // Lấy vị trí của canvas trong container
     const canvasRect = canvas.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    
+
     // Tính offset của canvas so với container (do padding)
     const canvasOffsetX = canvasRect.left - containerRect.left;
     const canvasOffsetY = canvasRect.top - containerRect.top;
-    
+
     // Tính vị trí mới dựa trên vị trí mouse và offset ban đầu
     let newX = clientX - dragStart.x;
     let newY = clientY - dragStart.y;
-    
+
     // Kích thước thực của canvas (hiển thị, không phải resolution)
     const displayWidth = canvasRect.width;
     const displayHeight = canvasRect.height;
-    
+
     // Constrain trong phạm vi canvas
     // Min là vị trí góc trái trên của canvas
     // Max là góc phải dưới trừ đi kích thước signature
@@ -421,63 +421,63 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
     const minY = canvasOffsetY;
     const maxX = canvasOffsetX + displayWidth - signatureSize.width;
     const maxY = canvasOffsetY + displayHeight - signatureSize.height;
-    
+
     newX = Math.max(minX, Math.min(newX, maxX));
     newY = Math.max(minY, Math.min(newY, maxY));
-    
+
     setSignaturePosition({ x: newX, y: newY });
   }, [isDragging, dragStart, signatureSize]);
-  
+
   // Handle drag end
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
-  
+
   // Insert signature into PDF
   const insertSignature = async () => {
     if (!selectedSignature) {
       setError('Vui lòng chọn chữ ký');
       return;
     }
-    
+
     if (!pin || pin.length < 4) {
       setError('Vui lòng nhập mã PIN (ít nhất 4 ký tự)');
       return;
     }
-    
+
     if (!uploadedFile) {
       setError('Không tìm thấy file PDF');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const token = await getAccessToken();
-      
+
       // Tính toán tọa độ chuẩn hóa trên PDF gốc
       const canvas = canvasRef.current;
       const container = containerRef.current;
       let pdfX = 0;
       let pdfY = 0;
-      
+
       if (canvas && container) {
         const canvasRect = canvas.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        
+
         // Offset của canvas so với container
         const canvasOffsetX = canvasRect.left - containerRect.left;
         const canvasOffsetY = canvasRect.top - containerRect.top;
-        
+
         // Tọa độ relative to canvas (pixel trên màn hình)
         const relativeX = signaturePosition.x - canvasOffsetX;
         const relativeY = signaturePosition.y - canvasOffsetY;
-        
+
         // Chuyển đổi sang tọa độ gốc của PDF (chia cho scale)
         pdfX = relativeX / pdfScale;
         pdfY = relativeY / pdfScale;
-        
+
         console.log('Coords calculation:', {
           signaturePos: signaturePosition,
           canvasOffset: { x: canvasOffsetX, y: canvasOffsetY },
@@ -486,7 +486,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
           result: { x: pdfX, y: pdfY }
         });
       }
-      
+
       const formData = new FormData();
       formData.append('pdfFile', uploadedFile);
       formData.append('signatureId', selectedSignature.id);
@@ -497,23 +497,23 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       formData.append('width', Math.round(signatureSize.width / pdfScale)); // Scale cả kích thước chữ ký
       formData.append('height', Math.round(signatureSize.height / pdfScale));
       formData.append('pin', pin);
-      
+
       const res = await fetch(`${API_BASE_URL}/e-signature-ext/user-signature/insert-signature-to-pdf`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+
       const result = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(result.message || 'Không thể chèn chữ ký');
       }
-      
+
       // Lưu kết quả và chuyển sang bước gửi yêu cầu
       setSignedDocumentResult(result);
       setStep(4); // Chuyển sang bước gửi yêu cầu ký
-      
+
     } catch (err) {
       console.error('Insert signature error:', err);
       setError(err.message);
@@ -521,12 +521,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
-  
+
   // Add signatory
   const addSignatory = () => {
     setSignatories([...signatories, { email: '', name: '', order: signatories.length + 1 }]);
   };
-  
+
   // Remove signatory
   const removeSignatory = (index) => {
     if (signatories.length > 1) {
@@ -535,14 +535,14 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setSignatories(newSignatories.map((s, i) => ({ ...s, order: i + 1 })));
     }
   };
-  
+
   // Update signatory
   const updateSignatory = (index, field, value) => {
     const newSignatories = [...signatories];
     newSignatories[index] = { ...newSignatories[index], [field]: value };
     setSignatories(newSignatories);
   };
-  
+
   // Send signature request to others
   const sendSignatureRequest = async () => {
     // Validate signatories
@@ -551,25 +551,25 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setError('Vui lòng nhập ít nhất một email người ký hợp lệ');
       return;
     }
-    
+
     setSendingRequest(true);
     setError(null);
-    
+
     try {
       const token = await getAccessToken();
-      
+
       console.log('Signed Result:', signedDocumentResult);
       const documentId = signedDocumentResult?.data?.document?.id || currentDocumentId;
       console.log('Using Document ID for Request:', documentId);
-      
+
       if (!documentId) {
         throw new Error('Missing Document ID');
       }
-      
+
       // Bước 1: Tạo signature request trong database
       const createRes = await fetch(`${API_BASE_URL}/e-signature/signature-requests`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -584,15 +584,15 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
           expiresAt: deadline ? new Date(deadline).toISOString() : null
         })
       });
-      
+
       const createResult = await createRes.json();
-      
+
       if (!createRes.ok || !createResult.success) {
         throw new Error(createResult.message || 'Không thể tạo yêu cầu ký');
       }
-      
+
       const requestId = createResult.data?.id;
-      
+
       // Bước 2: Trigger n8n workflow 1 để gửi email
       const sendRes = await fetch(`${N8N_URL}/webhook/e-signature/send-request`, {
         method: 'POST',
@@ -601,9 +601,9 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
           requestId: requestId
         })
       });
-      
+
       const sendResult = await sendRes.json();
-      
+
       if (sendResult.success || sendRes.ok) {
         // Success - thông báo và đóng modal
         if (onSuccess) {
@@ -625,7 +625,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       setSendingRequest(false);
     }
   };
-  
+
   // Skip sending request - just close
   const skipSendRequest = () => {
     if (onSuccess) {
@@ -633,27 +633,27 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
     }
     onClose();
   };
-  
+
   // Effects
   useEffect(() => {
     if (isOpen) {
       loadSignatures();
     }
   }, [isOpen]);
-  
+
   useEffect(() => {
     if (pdfDoc) {
       renderPage(pdfDoc, currentPage);
     }
   }, [pdfDoc, currentPage, currentScale]);
-  
+
   useEffect(() => {
     if (positionPreset !== 'custom' && canvasRef.current) {
       const pos = calculatePresetPosition(positionPreset, canvasRef.current.width, canvasRef.current.height);
       setSignaturePosition(pos);
     }
   }, [positionPreset]);
-  
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleDragMove);
@@ -661,7 +661,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       document.addEventListener('touchmove', handleDragMove);
       document.addEventListener('touchend', handleDragEnd);
     }
-    
+
     return () => {
       document.removeEventListener('mousemove', handleDragMove);
       document.removeEventListener('mouseup', handleDragEnd);
@@ -669,7 +669,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
       document.removeEventListener('touchend', handleDragEnd);
     };
   }, [isDragging, handleDragMove, handleDragEnd]);
-  
+
   // Reset on close
   const handleClose = () => {
     setPdfDoc(null);
@@ -689,9 +689,9 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
     setDeadline('');
     onClose();
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <div className="modal-overlay" style={styles.overlay}>
       <div className="modal-content" style={styles.modal}>
@@ -703,12 +703,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
           </h2>
           <button onClick={handleClose} style={styles.closeBtn}>×</button>
         </div>
-        
+
         {/* Steps indicator */}
         <div style={styles.steps}>
           {['Upload PDF', 'AI Detect', 'Ký tài liệu', 'Gửi yêu cầu'].map((s, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               style={{
                 ...styles.step,
                 backgroundColor: step > i + 1 ? '#10b981' : step === i + 1 ? '#6366f1' : '#e5e7eb',
@@ -719,14 +719,14 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
           ))}
         </div>
-        
+
         {/* Error display */}
         {error && (
           <div style={styles.error}>
             <i className="fas fa-exclamation-circle"></i> {error}
           </div>
         )}
-        
+
         {/* Content */}
         <div style={styles.content}>
           {/* Step 1: Upload PDF */}
@@ -735,9 +735,9 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
               <div style={styles.uploadBox}>
                 <i className="fas fa-cloud-upload-alt" style={{ fontSize: '48px', color: '#6366f1', marginBottom: '16px' }}></i>
                 <p style={{ marginBottom: '16px', color: '#6b7280' }}>Chọn file PDF để ký</p>
-                <input 
-                  type="file" 
-                  accept=".pdf" 
+                <input
+                  type="file"
+                  accept=".pdf"
                   onChange={handlePdfUpload}
                   style={{ display: 'none' }}
                   id="pdf-upload"
@@ -749,7 +749,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             </div>
           )}
-          
+
           {/* Step 2+: PDF Preview + Controls */}
           {step >= 2 && (
             <div style={styles.mainContent}>
@@ -759,13 +759,13 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                   <span>📄 {uploadedFile?.name}</span>
                   <span>Trang {currentPage}/{totalPages}</span>
                 </div>
-                
+
                 <div style={styles.canvasContainer} ref={containerRef}>
                   <canvas ref={canvasRef} style={styles.canvas}></canvas>
-                  
+
                   {/* Signature overlay */}
                   {selectedSignature && (
-                    <div 
+                    <div
                       ref={overlayRef}
                       style={{
                         ...styles.signatureOverlay,
@@ -778,19 +778,19 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                       onMouseDown={handleDragStart}
                       onTouchStart={handleDragStart}
                     >
-                      <img 
-                        src={selectedSignature.image_url} 
-                        alt="Signature" 
+                      <img
+                        src={selectedSignature.image_url}
+                        alt="Signature"
                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                       />
                       <div style={styles.dragHint}>Kéo để di chuyển</div>
                     </div>
                   )}
                 </div>
-                
+
                 {/* Page navigation */}
                 <div style={styles.pageNav}>
-                  <button 
+                  <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage <= 1}
                     style={styles.navBtn}
@@ -798,7 +798,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     ← Trang trước
                   </button>
                   <span>Trang {currentPage} / {totalPages}</span>
-                  <button 
+                  <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage >= totalPages}
                     style={styles.navBtn}
@@ -807,30 +807,30 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                   </button>
                 </div>
               </div>
-              
+
               {/* Right: Controls */}
               <div style={styles.controlPanel}>
                 {/* Upload Status Message */}
                 {step === 2 && uploadMessage && (
                   <div style={{
                     ...styles.section,
-                    backgroundColor: uploadStatus === 'success' ? '#ecfdf5' : 
-                                     uploadStatus === 'error' ? '#fef2f2' : 
-                                     uploadStatus === 'uploading' ? '#eff6ff' : '#f9fafb',
-                    borderColor: uploadStatus === 'success' ? '#10b981' : 
-                                 uploadStatus === 'error' ? '#ef4444' : 
-                                 uploadStatus === 'uploading' ? '#3b82f6' : '#e5e7eb'
+                    backgroundColor: uploadStatus === 'success' ? '#ecfdf5' :
+                      uploadStatus === 'error' ? '#fef2f2' :
+                        uploadStatus === 'uploading' ? '#eff6ff' : '#f9fafb',
+                    borderColor: uploadStatus === 'success' ? '#10b981' :
+                      uploadStatus === 'error' ? '#ef4444' :
+                        uploadStatus === 'uploading' ? '#3b82f6' : '#e5e7eb'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {uploadStatus === 'uploading' && <i className="fas fa-spinner fa-spin" style={{ color: '#3b82f6' }}></i>}
                       {uploadStatus === 'success' && <i className="fas fa-check-circle" style={{ color: '#10b981' }}></i>}
                       {uploadStatus === 'error' && <i className="fas fa-exclamation-circle" style={{ color: '#ef4444' }}></i>}
-                      <span style={{ 
-                        fontSize: '14px', 
+                      <span style={{
+                        fontSize: '14px',
                         fontWeight: '500',
-                        color: uploadStatus === 'success' ? '#059669' : 
-                               uploadStatus === 'error' ? '#dc2626' : 
-                               uploadStatus === 'uploading' ? '#2563eb' : '#374151'
+                        color: uploadStatus === 'success' ? '#059669' :
+                          uploadStatus === 'error' ? '#dc2626' :
+                            uploadStatus === 'uploading' ? '#2563eb' : '#374151'
                       }}>
                         {uploadMessage}
                       </span>
@@ -850,7 +850,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
                       AI sẽ phân tích PDF và tìm các vị trí cần chữ ký
                     </p>
-                    <button 
+                    <button
                       onClick={detectSignaturePositions}
                       disabled={isDetecting || uploadStatus !== 'success' || !currentDocumentId}
                       style={{
@@ -873,14 +873,14 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                         </>
                       )}
                     </button>
-                    
+
                     {uploadStatus !== 'success' && (
                       <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '8px', textAlign: 'center' }}>
                         ⚠️ Vui lòng đợi file được upload lên database trước khi sử dụng AI
                       </p>
                     )}
-                    
-                    <button 
+
+                    <button
                       onClick={() => setStep(3)}
                       style={{ ...styles.secondaryBtn, marginTop: '12px' }}
                       disabled={uploadStatus !== 'success'}
@@ -889,14 +889,14 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     </button>
                   </div>
                 )}
-                
+
                 {/* AI Detected Positions */}
                 {step >= 3 && aiDetectedPositions.length > 0 && (
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>📍 Vị trí AI phát hiện</h3>
                     <div style={styles.positionsList}>
                       {aiDetectedPositions.map((pos, idx) => (
-                        <div 
+                        <div
                           key={idx}
                           onClick={() => applyPosition(pos)}
                           style={styles.positionItem}
@@ -908,14 +908,14 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Signature Selection */}
                 {step >= 3 && (
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>✍️ Chọn chữ ký</h3>
                     <div style={styles.signatureList}>
                       {signatures.map(sig => (
-                        <div 
+                        <div
                           key={sig.id}
                           onClick={() => setSelectedSignature(sig)}
                           style={{
@@ -931,12 +931,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Position controls */}
                 {step >= 3 && selectedSignature && (
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>📍 Vị trí</h3>
-                    <select 
+                    <select
                       value={positionPreset}
                       onChange={e => setPositionPreset(e.target.value)}
                       style={styles.select}
@@ -948,12 +948,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                       <option value="center">Giữa trang</option>
                       <option value="custom">Tùy chỉnh (kéo thả)</option>
                     </select>
-                    
+
                     <div style={styles.sizeInputs}>
                       <div>
                         <label style={styles.label}>Rộng (px)</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={signatureSize.width}
                           onChange={e => setSignatureSize(s => ({ ...s, width: parseInt(e.target.value) || 150 }))}
                           style={styles.input}
@@ -961,8 +961,8 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                       </div>
                       <div>
                         <label style={styles.label}>Cao (px)</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={signatureSize.height}
                           onChange={e => setSignatureSize(s => ({ ...s, height: parseInt(e.target.value) || 75 }))}
                           style={styles.input}
@@ -971,12 +971,12 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* PIN input */}
                 {step >= 3 && selectedSignature && (
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>🔐 Xác thực</h3>
-                    <input 
+                    <input
                       type="password"
                       placeholder="Nhập mã PIN"
                       value={pin}
@@ -989,17 +989,17 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     </p>
                   </div>
                 )}
-                
+
                 {/* Action buttons for step 3 */}
                 {step === 3 && (
                   <div style={styles.actions}>
-                    <button 
+                    <button
                       onClick={handleClose}
                       style={styles.cancelBtn}
                     >
                       Hủy
                     </button>
-                    <button 
+                    <button
                       onClick={insertSignature}
                       disabled={!selectedSignature || !pin || loading}
                       style={{
@@ -1022,7 +1022,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             </div>
           )}
-          
+
           {/* Step 4: Send Signature Request */}
           {step === 4 && (
             <div style={styles.sendRequestContainer}>
@@ -1032,10 +1032,10 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                 <h3 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Ký tài liệu thành công!</h3>
                 <p style={{ margin: 0, opacity: 0.9 }}>Bạn có thể gửi yêu cầu ký cho người khác hoặc kết thúc.</p>
               </div>
-              
+
               <div style={styles.sendRequestContent}>
                 <h3 style={styles.sectionTitle}>📧 Gửi yêu cầu ký cho người khác</h3>
-                
+
                 {/* Signatories list */}
                 <div style={styles.signatoriesSection}>
                   <label style={styles.label}>Người ký</label>
@@ -1070,7 +1070,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     <i className="fas fa-plus"></i> Thêm người ký
                   </button>
                 </div>
-                
+
                 {/* Message */}
                 <div style={styles.field}>
                   <label style={styles.label}>Lời nhắn (tùy chọn)</label>
@@ -1082,7 +1082,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     rows={3}
                   />
                 </div>
-                
+
                 {/* Deadline */}
                 <div style={styles.field}>
                   <label style={styles.label}>Hạn chót (tùy chọn)</label>
@@ -1094,16 +1094,16 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
                     style={styles.input}
                   />
                 </div>
-                
+
                 {/* Action buttons */}
                 <div style={styles.actions}>
-                  <button 
+                  <button
                     onClick={skipSendRequest}
                     style={styles.skipBtn}
                   >
                     Bỏ qua, kết thúc
                   </button>
-                  <button 
+                  <button
                     onClick={sendSignatureRequest}
                     disabled={sendingRequest}
                     style={{
@@ -1126,7 +1126,7 @@ const InsertSignatureModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
           )}
         </div>
-        
+
         {/* Loading overlay */}
         {loading && (
           <div style={styles.loadingOverlay}>
