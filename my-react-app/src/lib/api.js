@@ -416,7 +416,8 @@ import { supabase } from './supabase';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://api.docsops.me/api/v1';
 
 // --- CẤU HÌNH BACKEND 2 (Audit Service - Port 5000) ---
-const AUDIT_API_BASE_URL = import.meta.env.VITE_API_AUDIT_URL || '/audit-api';
+// const AUDIT_API_BASE_URL = import.meta.env.VITE_BASE_API_URL || '/audit-api';
+const AUDIT_API_BASE_URL =  'https://api.docsops.me/api/v2';
 
 /**
  * Make API request cho Backend 1
@@ -469,7 +470,7 @@ async function apiRequest(endpoint, options = {}) {
 
     return result;
   } catch (error) {
-    if (!options.silent) console.error('❌ BE1 API Request Error:', error);
+    if (!options.silent) console.error('❌ BE1 API Request Error:' + url);
     throw error;
   }
 }
@@ -498,7 +499,7 @@ async function auditApiRequest(endpoint, options = {}) {
   
       return result;
     } catch (error) {
-      console.error('❌ BE2 (Audit) API Request Error:', error);
+      console.error('❌ BE2 (Audit) API Request Error:'+url, error);
       throw error;
     }
 }

@@ -7,7 +7,7 @@ import '../styles/dashboard.css';
 
 // URL API của bạn (Backend 1 hoặc Backend 2 tùy cấu hình proxy)
 
-const API_URL = import.meta.env.VITE_AUDIT_API_URL2 || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_AUDIT_API_URL2 || 'https://api.docsops.me/api';
 
 
 const Storage = () => {
